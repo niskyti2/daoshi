@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>导师评价检索</title>
+  <!-- Tailwind CSS 引入 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Wordcloud2 词云库 -->
+  <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+  <style>
+    .word-cloud-canvas {
+      width: 100%;
+      height: 260px;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- 头部 Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="bg-blue-600 text-white p-2 rounded-lg font-bold text-xl leading-none">导</div>
+        <h1 class="text-xl font-bold text-slate-900 tracking-tight">导师评价检索</h1>
+      </div>
+      <div class="flex items-center space-x-3 text-sm">
+        <label class="cursor-pointer bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-md border border-slate-300 transition">
+          <span>批量导入 JSON</span>
+          <input type="file" id="jsonFileInput" accept=".json" class="hidden">
+        </label>
+        <button id="downloadBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md font-medium transition shadow-sm">
+          下载当前 JSON 数据
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主体区域 -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full space-y-6">
+
+    <!-- 免责声明与词云图表区 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- 免责声明卡片 -->
+      <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 flex flex-col justify-between">
+        <div>
+          <div class="flex items-center space-x-2 text-amber-800 font-bold mb-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <span>数据免责声明</span>
+          </div>
+          <p class="text-xs text-amber-700 leading-relaxed">
+            该表来自于导师评价网。导师评价网因为种种原因被关闭了，里面的所有信息均来自各网友分享，真假请自行甄辩。本平台仅提供数据结构化检索服务，不承担任何内容真实性责任。
+          </p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-amber-200/60 flex justify-between items-center text-xs text-amber-800">
+          <span>当前加载记录：<strong id="totalCount">0</strong> 条</span>
+          <span>匹配结果：<strong id="filteredCount">0</strong> 条</span>
+        </div>
+      </div>
+
+      <!-- 动态词云区域 -->
+      <div class="bg-white border border-slate-200 rounded-xl p-4 lg:col-span-2 shadow-sm flex flex-col justify-between">
+        <div class="flex justify-between items-center mb-1">
+          <h2 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <span>高频词云分析</span>
+            <span class="text-xs font-normal text-slate-400">（基于当前筛选结果的高频词）</span>
+          </h2>
+          <span id="cloudStatus" class="text-xs text-slate-400">生成中...</span>
+        </div>
+        <div class="relative w-full flex-grow flex items-center justify-center bg-slate-50/50 rounded-lg overflow-hidden border border-slate-100">
+          <canvas id="wordCloudCanvas" class="word-cloud-canvas"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 检索控制面板 -->
+    <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <!-- 学校筛选/输入 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">学校（选择或可自定义输入）</label>
+          <input type="text" id="schoolInput" list="schoolOptions" placeholder="输入或选择学校..." 
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <datalist id="schoolOptions"></datalist>
+        </div>
+
+        <!-- 专业筛选/输入 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">专业/学院（选择或可自定义输入）</label>
+          <input type="text" id="majorInput" list="majorOptions" placeholder="输入或选择专业..." 
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+          <datalist id="majorOptions"></datalist>
+        </div>
+
+        <!-- 姓名或关键词搜索 -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">导师姓名或评价关键词</label>
+          <input type="text" id="keywordInput" placeholder="搜索姓名/评价关键词..." 
+            class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition">
+        </div>
+
+      </div>
+
+      <div class="flex justify-between items-center pt-2">
+        <p class="text-xs text-slate-400">注：学校与专业非同时必要条件，支持单项筛选。</p>
+        <button id="resetBtn" class="text-xs text-slate-500 hover:text-blue-600 underline">清空筛选条件</button>
+      </div>
+    </div>
+
+    <!-- 检索结果列表/表格 -->
+    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-slate-100/75 border-b border-slate-200 text-slate-600 text-xs font-semibold tracking-wider">
+              <th class="py-3 px-4 w-1/6">学校</th>
+              <th class="py-3 px-4 w-1/6">专业 / 学院</th>
+              <th class="py-3 px-4 w-28">姓名</th>
+              <th class="py-3 px-4">详细评价</th>
+              <th class="py-3 px-4 w-32 text-center">SnowNLP 情感打分</th>
+            </tr>
+          </thead>
+          <tbody id="resultTableBody" class="divide-y divide-slate-100 text-sm">
+            <!-- 动态渲染内容 -->
+          </tbody>
+        </table>
+      </div>
+      <div id="noDataTip" class="hidden text-center py-12 text-slate-400 text-sm">
+        未查找到符合条件的导师评价数据
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // 全局数据源
+    let globalData = [];
+    let filteredData = [];
+
+    // DOM 元素获取
+    const schoolInput = document.getElementById('schoolInput');
+    const majorInput = document.getElementById('majorInput');
+    const keywordInput = document.getElementById('keywordInput');
+    const schoolOptions = document.getElementById('schoolOptions');
+    const majorOptions = document.getElementById('majorOptions');
+    const resultTableBody = document.getElementById('resultTableBody');
+    const noDataTip = document.getElementById('noDataTip');
+    const totalCountEl = document.getElementById('totalCount');
+    const filteredCountEl = document.getElementById('filteredCount');
+    const resetBtn = document.getElementById('resetBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const jsonFileInput = document.getElementById('jsonFileInput');
+    const wordCloudCanvas = document.getElementById('wordCloudCanvas');
+
+    // 页面加载完成后自动抓取当前目录下的 data.json
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchData();
+    });
+
+    // 异步加载 JSON 数据
+    async function fetchData() {
+      try {
+        const response = await fetch('./data.json');
+        if (!response.ok) throw new Error('无法读取 data.json 文件');
+        const data = await response.json();
+        loadDataset(data);
+      } catch (err) {
+        console.warn('默认 data.json 加载失败，等待手动导入数据。', err);
+      }
+    }
+
+    // 载入并初始化数据集
+    function loadDataset(data) {
+      if (!Array.isArray(data)) return;
+      globalData = data;
+      totalCountEl.textContent = globalData.length;
+      
+      populateDatalists();
+      applyFilter();
+    }
+
+    // 填充下拉菜单选项（去重）
+    function populateDatalists() {
+      const schools = [...new Set(globalData.map(item => item.school).filter(Boolean))];
+      const majors = [...new Set(globalData.map(item => item.major).filter(Boolean))];
+
+      schoolOptions.innerHTML = schools.map(s => `<option value="${s}">`).join('');
+      majorOptions.innerHTML = majors.map(m => `<option value="${m}">`).join('');
+    }
+
+    // 筛选的核心逻辑 (学校、专业二者非同时为必要条件)
+    function applyFilter() {
+      const selectedSchool = schoolInput.value.trim().toLowerCase();
+      const selectedMajor = majorInput.value.trim().toLowerCase();
+      const keyword = keywordInput.value.trim().toLowerCase();
+
+      filteredData = globalData.filter(item => {
+        const matchSchool = !selectedSchool || (item.school && item.school.toLowerCase().includes(selectedSchool));
+        const matchMajor = !selectedMajor || (item.major && item.major.toLowerCase().includes(selectedMajor));
+        const matchKeyword = !keyword || 
+          (item.name && item.name.toLowerCase().includes(keyword)) || 
+          (item.comment && item.comment.toLowerCase().includes(keyword));
+
+        return matchSchool && matchMajor && matchKeyword;
+      });
+
+      filteredCountEl.textContent = filteredData.length;
+      renderTable(filteredData);
+      renderWordCloud(filteredData);
+    }
+
+    // 渲染结果表格
+    function renderTable(data) {
+      if (data.length === 0) {
+        resultTableBody.innerHTML = '';
+        noDataTip.classList.remove('hidden');
+        return;
+      }
+
+      noDataTip.classList.add('hidden');
+      resultTableBody.innerHTML = data.map(item => {
+        const score = typeof item.score === 'number' ? item.score : parseFloat(item.score || 0);
+        
+        // 情感分颜色区分：极正面(绿)、中性(黄/蓝)、负面(红)
+        let scoreBadge = '';
+        if (score >= 0.7) {
+          scoreBadge = `<span class="px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">${score.toFixed(4)}</span>`;
+        } else if (score <= 0.3) {
+          scoreBadge = `<span class="px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-800">${score.toFixed(4)}</span>`;
+        } else {
+          scoreBadge = `<span class="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">${score.toFixed(4)}</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-4 font-medium text-slate-900 align-top">${escapeHtml(item.school || '-')}</td>
+            <td class="py-3 px-4 text-slate-600 align-top">${escapeHtml(item.major || '-')}</td>
+            <td class="py-3 px-4 font-semibold text-slate-800 align-top">${escapeHtml(item.name || '-')}</td>
+            <td class="py-3 px-4 text-slate-600 leading-relaxed align-top">${item.comment || '-'}</td>
+            <td class="py-3 px-4 text-center align-top">${scoreBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 辅助转义 HTML，防止 XSS
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // 提取简单文本高频词并绘制词云
+    function renderWordCloud(data) {
+      const cloudStatus = document.getElementById('cloudStatus');
+      if (!data || data.length === 0) {
+        WordCloud(wordCloudCanvas, { list: [] });
+        cloudStatus.textContent = "无数据";
+        return;
+      }
+
+      // 提取评价文本并做简单分词/清洗
+      const text = data.map(d => d.comment || '').join(' ').replace(/<br\s*\/?>/gi, ' ');
+      const stopWords = new Set(["导师", "辨识", "特征", "学术", "水平", "科研", "经费", "学生", "补助", "师生", "关系", "工作", "时间", "前途", "自证", "认识", "利益", "相关", "的一", "就是", "没有", "比较", "非常", "一个", "属于", "自己", "感觉", "这个", "什么", "不太", "还行", "不错", "可以"]);
+      
+      const words = text.match(/[\u4e00-\u9fa5]{2,6}/g) || [];
+      const freqMap = {};
+
+      words.forEach(w => {
+        if (!stopWords.has(w)) {
+          freqMap[w] = (freqMap[w] || 0) + 1;
+        }
+      });
+
+      const wordList = Object.entries(freqMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 45); // 取前 45 个高频词
+
+      cloudStatus.textContent = `基于 ${data.length} 条记录`;
+
+      // 使用 WordCloud2 渲染
+      WordCloud(wordCloudCanvas, {
+        list: wordList,
+        gridSize: 8,
+        weightFactor: function (size) {
+          return Math.min(Math.max(size * 6, 12), 36);
+        },
+        fontFamily: 'sans-serif',
+        color: 'random-dark',
+        backgroundColor: 'transparent',
+        rotateRatio: 0.2
+      });
+    }
+
+    // 事件监听：动态输入检索
+    schoolInput.addEventListener('input', applyFilter);
+    majorInput.addEventListener('input', applyFilter);
+    keywordInput.addEventListener('input', applyFilter);
+
+    // 重置按钮事件
+    resetBtn.addEventListener('click', () => {
+      schoolInput.value = '';
+      majorInput.value = '';
+      keywordInput.value = '';
+      applyFilter();
+    });
+
+    // 支持批量 JSON 文件上传解析
+    jsonFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const importedData = JSON.parse(event.target.result);
+          if (Array.isArray(importedData)) {
+            loadDataset(importedData);
+            alert(`成功导入 ${importedData.length} 条记录！`);
+          } else {
+            alert('导入失败：JSON 格式应为对象数组！');
+          }
+        } catch (err) {
+          alert('解析 JSON 文件出错，请检查文件格式。');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // 导出/下载当前数据集 JSON 链接
+    downloadBtn.addEventListener('click', () => {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(globalData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "导师评价数据.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    });
+  </script>
+</body>
+</html>
