@@ -335,7 +335,25 @@
     }
 
     // 初始化运行
-    window.addEventListener('DOMContentLoaded', initData);
+        window.addEventListener('DOMContentLoaded', initData);
+        <!-- 实时时间与访问量统计区域 -->
+    <div class="hidden md:flex items-center space-x-4 text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 mr-2">
+      <!-- 实时时间 -->
+      <div class="flex items-center space-x-1">
+        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span id="realtimeClock" class="font-mono text-gray-700">加载时间中...</span>
+      </div>  
+      <span class="text-gray-300">|</span>
+      <!-- 今日访问量 -->
+      <div>
+        今日访问：<span id="todayViews" class="font-bold text-blue-600">--</span>
+      </div>
+      <span class="text-gray-300">|</span>
+        <!-- 总访问量 -->
+      <div>
+        总访问量：<span id="totalViews" class="font-bold text-gray-700">--</span>
+      </div>
+    </div>
   </script>
 </body>
 </html>
